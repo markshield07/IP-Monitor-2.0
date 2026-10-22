@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GoTo Device Monitor</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+:root{--goto-yellow:#F5C800;--goto-yellow-dark:#D4AC00;--goto-yellow-light:#FFF9CC;--goto-black:#0A0A0A;--goto-black-hover:#1F1F1F;--goto-bg:#F5F5F5;--goto-card:#FFFFFF;--goto-text:#0A0A0A;--goto-text-muted:#6B7280;--goto-border:#E5E5E5;--goto-success:#22C55E;--goto-danger:#EF4444}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Arial,sans-serif;background:#F5F5F5;color:#0A0A0A;display:flex;height:100vh}
+#sidebar{width:220px;background:#0A0A0A;color:#fff;display:flex;flex-direction:column;flex-shrink:0}
+.logo{padding:20px 16px;font-size:1.1rem;font-weight:700;border-bottom:1px solid #1F1F1F;color:#fff}
+.logo span{color:#F5C800}
+.nav-section{padding:12px 16px 4px;font-size:0.7rem;text-transform:uppercase;letter-spacing:1px;color:#888}
+.nav-item{padding:10px 16px;cursor:pointer;font-size:0.875rem;border-left:3px solid transparent;transition:background 0.15s;color:#ccc}
+.nav-item:hover{background:#1F1F1F;color:#F5C800}
+.nav-item.active{background:#1F1F1F;border-left-color:#F5C800;color:#F5C800;font-weight:600}
+.status-pill{margin:16px;padding:6px 10px;background:rgba(245,200,0,0.15);border:1px solid #F5C800;border-radius:20px;font-size:0.75rem;color:#F5C800;text-align:center}
+#main{flex:1;overflow-y:auto;padding:24px}
+.topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px}
+.topbar h1{font-size:1.4rem;font-weight:700;color:#0A0A0A}
+.refresh-badge{font-size:0.8rem;color:#6B7280;background:#FFF9CC;padding:4px 10px;border-radius:12px}
+.stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px}
+.stat-card{background:#fff;border:1px solid #E5E5E5;border-radius:10px;padding:16px 20px;text-align:center}
+.stat-value{font-size:2rem;font-weight:700;color:#0A0A0A}
+.stat-label{font-size:0.8rem;color:#6B7280;margin-top:4px}
+.stat-card.online .stat-value{color:#22C55E}
+.stat-card.offline .stat-value{color:#EF4444}
+.card{background:#fff;border:1px solid #E5E5E5;border-radius:10px;padding:20px;margin-bottom:20px}
+.card h2{font-size:1rem;font-weight:600;color:#0A0A0A;margin-bottom:14px;border-bottom:2px solid #F5C800;padding-bottom:8px}
+.btn{padding:7px 16px;border:none;border-radius:6px;cursor:pointer;font-size:0.85rem;font-weight:600;transition:opacity 0.15s}
+.btn:hover{opacity:0.88}
+.btn-primary{background:#F5C800;color:#0A0A0A}
+.btn-teal{background:#0A0A0A;color:#F5C800;border:1px solid #F5C800}
+.btn-danger{background:#EF4444;color:#fff}
+.btn-outline{background:transparent;border:1px solid #0A0A0A;color:#0A0A0A}
+.btn-sm{padding:4px 10px;font-size:0.78rem}
+table{width:100%;border-collapse:collapse;font-size:0.875rem}
+th{background:#F5C800;color:#0A0A0A;padding:10px 12px;text-align:left;font-weight:700;font-size:0.78rem;text-transform:uppercase}
+td{padding:10px 12px;border-bottom:1px solid #E5E5E5}
+tr:hover td{background:#FFFDE6}
+.badge{padding:3px 10px;border-radius:12px;font-size:0.75rem;font-weight:600;display:inline-block}
+.badge-up{background:#DCFCE7;color:#15803D}
+.badge-down{background:#FEE2E2;color:#B91C1C}
+.badge-unknown{background:#F3F4F6;color:#6B7280}
+label{font-size:0.8rem;font-weight:600;color:#0A0A0A;display:block;margin-bottom:3px}
+input[type="text"],input[type="email"],select,textarea{width:100%;padding:8px 10px;border:1px solid #E5E5E5;border-radius:6px;font-size:0.875rem;color:#0A0A0A;background:#fff;margin-bottom:10px}
+input:focus,select:focus,textarea:focus{outline:none;border-color:#F5C800;box-shadow:0 0 0 3px rgba(245,200,0,0.25)}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.section{display:none}.section.active{display:block}
+.filter-bar{display:flex;gap:10px;margin-bottom:14px}
+.filter-bar input,.filter-bar select{margin-bottom:0}
+.filter-bar input{flex:1;min-width:0}
+.filter-bar select{flex:0 0 180px;width:180px}
+.drop-zone{border:2px dashed #E5E5E5;border-radius:8px;padding:24px;text-align:center;color:#6B7280;font-size:0.875rem;cursor:pointer;margin-top:16px}
+.drop-zone:hover{border-color:#F5C800;color:#0A0A0A}
+.drop-zone.drag-over{border-color:#F5C800;background:#FFF9CC;color:#0A0A0A}
+.template-link{display:inline-block;margin-top:10px;font-weight:700;color:#0A0A0A;text-decoration:underline;text-decoration-color:#F5C800;text-decoration-thickness:2px;text-underline-offset:3px}
+.template-link:hover{color:#D4AC00}
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:1000;align-items:center;justify-content:center}
+.modal-overlay.open{display:flex}
+.modal{background:#fff;border-radius:12px;padding:28px;width:480px;max-width:95vw;max-height:90vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,0.25)}
+.modal h3{font-size:1.1rem;font-weight:700;color:#0A0A0A;margin-bottom:18px;border-bottom:2px solid #F5C800;padding-bottom:8px}
+.modal-footer{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}
+#toast{position:fixed;bottom:24px;right:24px;padding:12px 20px;border-radius:8px;font-size:0.875rem;font-weight:600;display:none;z-index:9999}
+#toast.success{background:#F5C800;color:#0A0A0A}
+#toast.error{background:#EF4444;color:#fff}
+.summary-row{cursor:pointer;background:#FFF9CC}
+.summary-row:hover td{background:#FFF3A0}
+.expand-icon{display:inline-block;width:20px;transition:transform 0.2s}
+.detail-header td{background:#0A0A0A;color:#F5C800;font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;padding:8px 12px;border-bottom:none}
+.detail-header:hover td{background:#0A0A0A}
+.detail-row td{font-size:0.82rem}
+.detail-row:hover td{background:#F9F9F9}
+/* ---- Navigation as real buttons (keyboard accessible) ---- */
+button.nav-item{display:block;width:100%;background:none;border:none;border-left:3px solid transparent;text-align:left;font:inherit;font-size:0.875rem}
+.nav-item:focus-visible,.btn:focus-visible,.stat-card:focus-visible,.summary-row:focus-visible,.template-link:focus-visible{outline:3px solid #F5C800;outline-offset:2px}
+/* ---- Live status in the top bar ---- */
+.refresh-badge.ok::before{content:"● ";color:#22C55E}
+.refresh-badge.err{background:#FEE2E2;color:#B91C1C}
+.refresh-badge.err::before{content:"● ";color:#EF4444}
+/* ---- Clickable stat cards act as filters ---- */
+.stat-card{cursor:pointer;transition:border-color 0.15s}
+.stat-card:hover{border-color:#F5C800}
+.stat-card.selected{border:2px solid #F5C800;padding:15px 19px}
+.stat-hint{font-size:0.75rem;color:#6B7280;margin:-12px 0 20px}
+/* ---- Tables ---- */
+.table-wrap{overflow-x:auto}
+.empty-state{text-align:center;color:#6B7280;padding:28px 12px}
+.empty-state strong{display:block;color:#0A0A0A;margin-bottom:4px}
+.card-head{display:flex;justify-content:space-between;align-items:center;gap:12px;border-bottom:2px solid #F5C800;margin-bottom:14px;padding-bottom:8px}
+.card-head h2{border:none;margin:0;padding:0}
+.muted{color:#6B7280}
+.help{font-size:0.8rem;color:#6B7280;margin:-4px 0 14px}
+.metric-label{font-size:0.75rem;color:#6B7280;font-weight:600}
+.metric-value{font-size:1rem;font-weight:700;color:#0A0A0A}
+.latency-tab.btn-primary{border:1px solid #F5C800}
+/* ---- Email tag field ---- */
+.email-box{display:flex;flex-wrap:wrap;gap:6px;align-items:center;min-height:40px;padding:6px 8px;border:1px solid #E5E5E5;border-radius:6px;background:#fff;cursor:text}
+.email-box:focus-within{border-color:#F5C800;box-shadow:0 0 0 3px rgba(245,200,0,0.25)}
+.email-box.invalid{border-color:#EF4444}
+.email-box input.email-entry{flex:1;min-width:180px;border:none;outline:none;box-shadow:none;padding:4px;margin:0;font-size:0.875rem;background:transparent}
+.email-box input.email-entry:focus{box-shadow:none}
+.chip{display:inline-flex;align-items:center;gap:6px;background:#FFF9CC;border:1px solid #F5C800;color:#0A0A0A;border-radius:14px;padding:3px 4px 3px 10px;font-size:0.8rem;max-width:100%}
+.chip span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chip button{border:none;background:transparent;cursor:pointer;font-size:1rem;line-height:1;width:20px;height:20px;border-radius:50%;color:#6B7280}
+.chip button:hover,.chip button:focus-visible{background:#F5C800;color:#0A0A0A;outline:none}
+.field-error{color:#B91C1C;font-size:0.78rem;min-height:1em;margin:4px 0 6px}
+.field-help{font-size:0.78rem;color:#6B7280;margin:0 0 12px}
+.notice{display:flex;justify-content:space-between;align-items:center;gap:12px;background:#FEF3C7;border:1px solid #F5C800;border-radius:8px;padding:10px 14px;margin-bottom:20px;font-size:0.875rem}
+.notice[hidden]{display:none}
+@media (max-width:900px){
+  body{flex-direction:column;height:auto;min-height:100vh}
+  #sidebar{width:100%;flex-direction:row;flex-wrap:wrap;align-items:center}
+  #sidebar .nav-section{display:none}
+  button.nav-item{width:auto;border-left:none;border-bottom:3px solid transparent}
+  .nav-item.active{border-bottom-color:#F5C800}
+  .stat-grid{grid-template-columns:repeat(2,1fr)}
+  .form-row{grid-template-columns:1fr}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<nav id="sidebar" aria-label="Main">
+<div class="logo">GoTo <span>Monitor</span></div>
+<div class="nav-section">Monitor</div>
+<button class="nav-item active" data-section="dashboard" onclick="showSection('dashboard',this)">◉ Dashboard</button>
+<button class="nav-item" data-section="incidents" onclick="showSection('incidents',this)">⚠ Incidents</button>
+<button class="nav-item" data-section="latency" onclick="showSection('latency',this)">⋯ Latency</button>
+<div class="nav-section">Actions</div>
+<button class="nav-item" onclick="openModal('add-modal')">+ Add device</button>
+<button class="nav-item" onclick="exportCsv()">⇩ Export incident report</button>
+<div class="nav-section">Settings</div>
+<button class="nav-item" onclick="openSettingsModal()">⚙ Alert settings</button>
+<button class="nav-item" data-section="audit" onclick="showSection('audit',this)">☰ Audit log</button>
+</nav>
+<main id="main">
+
+<section id="section-dashboard" class="section active">
+<div class="topbar"><h1>Device Monitor</h1><span class="refresh-badge" id="last-updated" aria-live="polite">Loading…</span></div>
+<div class="notice" id="no-alerts-notice" hidden><span><strong>No one is set up to get alerts.</strong> Devices without their own alert emails will go offline silently.</span><button class="btn btn-primary btn-sm" onclick="openSettingsModal()">Add alert emails</button></div>
+<div class="stat-grid">
+<div class="stat-card" role="button" tabindex="0" data-filter="" title="Show all devices"><div class="stat-value" id="stat-total">{{ hosts|length }}</div><div class="stat-label">Total devices</div></div>
+<div class="stat-card online" role="button" tabindex="0" data-filter="up" title="Show only online devices"><div class="stat-value" id="stat-online">{{ hosts|selectattr('status','equalto','up')|list|length }}</div><div class="stat-label">Online</div></div>
+<div class="stat-card offline" role="button" tabindex="0" data-filter="down" title="Show only offline devices"><div class="stat-value" id="stat-offline">{{ hosts|selectattr('status','equalto','down')|list|length }}</div><div class="stat-label">Offline</div></div>
+<div class="stat-card" role="button" tabindex="0" data-filter="unknown" title="Show devices waiting for their first check"><div class="stat-value" id="stat-pending">{{ hosts|selectattr('status','equalto','unknown')|list|length }}</div><div class="stat-label">Waiting for first check</div></div>
+</div>
+<p class="stat-hint">Click a number to show only those devices.</p>
+
+<div class="card">
+<h2>Add a device</h2>
+<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;">
+<div style="flex:1;min-width:140px;"><label for="quick-ip">IP address *</label><input type="text" id="quick-ip" placeholder="192.168.1.1" style="margin-bottom:0;"></div>
+<div style="flex:1;min-width:140px;"><label for="quick-name">Customer name *</label><input type="text" id="quick-name" list="customer-list" placeholder="Acme Corp" style="margin-bottom:0;"></div>
+<div style="flex:1;min-width:120px;"><label for="quick-location">Location</label><input type="text" id="quick-location" placeholder="New York, NY" style="margin-bottom:0;"></div>
+<div style="flex:1;min-width:120px;"><label for="quick-device-type">Device type</label><select id="quick-device-type" style="margin-bottom:0;"></select></div>
+<div style="flex:1;min-width:120px;"><label for="quick-ping-interval">Check every</label><select id="quick-ping-interval" style="margin-bottom:0;"></select></div>
+<div><button class="btn btn-primary" onclick="quickAdd()">+ Add device</button></div>
+</div>
+<datalist id="customer-list"></datalist>
+<div class="drop-zone" role="button" tabindex="0" onclick="document.getElementById('import-file').click()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}" ondragover="event.preventDefault();this.classList.add('drag-over')" ondragleave="this.classList.remove('drag-over')" ondrop="dropCsv(event,this)">⇧ Add many devices at once: click or drag a CSV file here<br><small>Columns: ip_address, customer_name, location, device_type, notes, ping_interval, alert_to</small><br><a class="template-link" href="/api/hosts/template" onclick="event.stopPropagation()">⇩ Download CSV template</a></div>
+<input type="file" id="import-file" accept=".csv" style="display:none;" onchange="importCsv(this)">
+</div>
+
+<div class="card">
+<h2>Monitored devices</h2>
+<div class="filter-bar">
+<input type="text" id="filter-text" placeholder="Search by IP, customer, location or device type" aria-label="Search devices" oninput="onFilterChange()">
+<select id="filter-status" aria-label="Filter by status" onchange="onFilterChange()"><option value="">All statuses</option><option value="up">Online</option><option value="down">Offline</option><option value="unknown">Waiting for first check</option></select>
+</div>
+<div class="table-wrap"><table id="hosts-table"><tbody id="hosts-grouped"></tbody></table></div>
+</div>
+</section>
+
+<section id="section-incidents" class="section">
+<div class="topbar"><h1>Incidents</h1><button class="btn btn-teal" onclick="exportCsv()">⇩ Download incident report (CSV)</button></div>
+<div class="card"><h2>Outage history</h2><p class="help">Each row is one outage: when a device stopped responding and when it came back.</p>
+<div class="table-wrap"><table><thead><tr><th>Status</th><th>Customer</th><th>IP address</th><th>Location</th><th>Went offline</th><th>Came back</th><th>Duration</th></tr></thead><tbody id="incidents-tbody"></tbody></table></div></div>
+</section>
+
+<section id="section-latency" class="section">
+<div class="topbar"><h1>Latency</h1></div>
+<div class="card"><h2>Response times by customer</h2><p class="help">How long each device takes to answer a ping. Lower is better.</p><label for="latency-customer">Customer</label><select id="latency-customer" onchange="onCustomerChange()" style="max-width:300px;"><option value="">Select a customer…</option></select><div id="latency-tabs" style="display:flex;gap:8px;margin:12px 0;flex-wrap:wrap;"></div><div id="latency-content"></div></div>
+</section>
+
+<section id="section-audit" class="section">
+<div class="topbar"><h1>Audit log</h1></div>
+<div class="card"><h2>Recent changes</h2><p class="help">Every device and setting change made in this tool, newest first.</p>
+<div class="table-wrap"><table><thead><tr><th>When</th><th>Action</th><th>Device or item</th><th>Details</th></tr></thead><tbody id="audit-tbody"></tbody></table></div></div>
+</section>
+</main>
+
+<div class="modal-overlay" id="add-modal" onclick="overlayClose(event,'add-modal')"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="add-title"><h3 id="add-title">Add a device</h3>
+<div class="form-row"><div><label for="add-ip">IP address *</label><input type="text" id="add-ip" placeholder="192.168.1.1"></div><div><label for="add-name">Customer name *</label><input type="text" id="add-name" list="customer-list" placeholder="Acme Corp"></div></div>
+<div class="form-row"><div><label for="add-location">Location</label><input type="text" id="add-location" placeholder="New York, NY"></div><div><label for="add-device-type">Device type</label><select id="add-device-type"></select></div></div>
+<label for="add-ping-interval">Check every</label><select id="add-ping-interval"></select>
+<label for="add-emails-entry">Alert emails <span class="muted" style="font-weight:400">(optional)</span></label>
+<div class="email-box" id="add-emails"><input type="email" class="email-entry" id="add-emails-entry" aria-describedby="add-emails-help"></div>
+<div class="field-error" id="add-emails-error" role="alert"></div>
+<p class="field-help" id="add-emails-help">Leave empty to send this device’s alerts to everyone in Alert settings. If you add emails here, only these people get this device’s alerts.</p>
+<label for="add-notes">Notes</label><textarea id="add-notes" rows="2" placeholder="Optional"></textarea>
+<div class="modal-footer"><button class="btn btn-outline" onclick="closeModal('add-modal')">Cancel</button><button class="btn btn-primary" onclick="addHost()">Add device</button></div></div></div>
+
+<div class="modal-overlay" id="edit-modal" onclick="overlayClose(event,'edit-modal')"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="edit-title"><h3 id="edit-title">Edit device</h3><input type="hidden" id="edit-id">
+<div class="form-row"><div><label for="edit-ip">IP address *</label><input type="text" id="edit-ip"></div><div><label for="edit-name">Customer name *</label><input type="text" id="edit-name" list="customer-list"></div></div>
+<div class="form-row"><div><label for="edit-location">Location</label><input type="text" id="edit-location"></div><div><label for="edit-device-type">Device type</label><select id="edit-device-type"></select></div></div>
+<label for="edit-ping-interval">Check every</label><select id="edit-ping-interval"></select>
+<label for="edit-emails-entry">Alert emails <span class="muted" style="font-weight:400">(optional)</span></label>
+<div class="email-box" id="edit-emails"><input type="email" class="email-entry" id="edit-emails-entry" aria-describedby="edit-emails-help"></div>
+<div class="field-error" id="edit-emails-error" role="alert"></div>
+<p class="field-help" id="edit-emails-help">Leave empty to send this device’s alerts to everyone in Alert settings. If you add emails here, only these people get this device’s alerts.</p>
+<label for="edit-notes">Notes</label><textarea id="edit-notes" rows="2"></textarea>
+<div class="modal-footer"><button class="btn btn-outline" onclick="closeModal('edit-modal')">Cancel</button><button class="btn btn-primary" onclick="saveEdit()">Save changes</button></div></div></div>
+
+<div class="modal-overlay" id="settings-modal" onclick="overlayClose(event,'settings-modal')"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="settings-title"><h3 id="settings-title">⚙ Alert settings</h3>
+<label for="settings-emails-entry">Who gets alerts</label>
+<div class="email-box" id="settings-emails"><input type="email" class="email-entry" id="settings-emails-entry" aria-describedby="settings-emails-help"></div>
+<div class="field-error" id="settings-emails-error" role="alert"></div>
+<p class="field-help" id="settings-emails-help">Type an email and press Enter to add it. Add as many people as you need. Everyone here is emailed when a device goes offline and when it comes back online.</p>
+<p class="field-help">A device can have its own alert emails instead. Set those by editing the device.</p>
+<div class="modal-footer"><button class="btn btn-outline" onclick="closeModal('settings-modal')">Cancel</button><button class="btn btn-primary" onclick="saveSettings()">Save settings</button></div></div></div>
+<div id="toast" role="status" aria-live="polite"></div>
+<script>
+// ---------- Shared lists (one place, so every form offers the same choices) ----------
+const DEVICE_TYPES=['Server','Switch','Router','Firewall','Printer','Access Point','Other'];
+const INTERVALS=[[60,'1 minute'],[120,'2 minutes'],[180,'3 minutes'],[300,'5 minutes'],[600,'10 minutes'],[900,'15 minutes'],[1800,'30 minutes'],[3600,'1 hour']];
+const STATUS_LABEL={up:'Online',down:'Offline',unknown:'Waiting'};
+const STATUS_ORDER={down:0,unknown:1,up:2};
+const AUDIT_LABEL={add_host:'Added device',update_host:'Edited device',remove_host:'Deleted device',bulk_import:'Imported CSV',update_settings:'Changed alert settings'};
+const REFRESH_MS=30000;
+
+let allHosts=[];
+let expandedGroups=new Set();
+let savedExpanded=null;
+
+function fillSelects(){
+  ['quick-device-type','add-device-type','edit-device-type'].forEach(id=>{
+    document.getElementById(id).innerHTML='<option value="">Not specified</option>'+DEVICE_TYPES.map(t=>'<option>'+t+'</option>').join('');});
+  ['quick-ping-interval','add-ping-interval','edit-ping-interval'].forEach(id=>{
+    document.getElementById(id).innerHTML=INTERVALS.map(([v,l])=>'<option value="'+v+'"'+(v===300?' selected':'')+'>'+l+'</option>').join('');});
+}
+
+// ---------- Helpers ----------
+function esc(v){return String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function parseUtc(s){if(!s)return null;let iso=String(s).replace(' ','T');if(!/[zZ]|[+-]\d\d:?\d\d$/.test(iso))iso+='Z';const d=new Date(iso);return isNaN(d)?null:d;}
+function fmtTime(s){const d=parseUtc(s);return d?d.toLocaleString([],{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}):'—';}
+function timeAgo(s){const d=parseUtc(s);if(!d)return 'Not yet';const sec=Math.round((Date.now()-d)/1000);if(sec<60)return 'Just now';if(sec<3600)return Math.floor(sec/60)+' min ago';if(sec<86400)return Math.floor(sec/3600)+' hr ago';return fmtTime(s);}
+function intervalLabel(s){s=parseInt(s)||300;return s<3600?(s/60)+' min':(s/3600)+' hr';}
+function fmtDuration(sec){if(!sec&&sec!==0)return 'Ongoing';if(sec<60)return sec+' sec';if(sec<3600)return Math.round(sec/60)+' min';if(sec<86400)return (sec/3600).toFixed(1)+' hr';return (sec/86400).toFixed(1)+' days';}
+function emptyRow(cols,title,text){return '<tr><td colspan="'+cols+'" class="empty-state"><strong>'+title+'</strong>'+text+'</td></tr>';}
+
+// ---------- Email tag field ----------
+const EMAIL_RE=/^[^@\s,;<>]+@[^@\s,;<>]+\.[A-Za-z]{2,}$/;
+const emailLists={};
+const EMAIL_PLACEHOLDER={settings:'Type an email and press Enter',add:'Leave empty to use the alert settings list',edit:'Leave empty to use the alert settings list'};
+function splitEmails(str){return String(str||'').split(/[,;\s]+/).map(x=>x.trim()).filter(Boolean);}
+function renderEmails(key){
+  const box=document.getElementById(key+'-emails');const input=box.querySelector('.email-entry');
+  box.querySelectorAll('.chip').forEach(c=>c.remove());
+  emailLists[key].forEach((addr,i)=>{
+    const chip=document.createElement('span');chip.className='chip';
+    chip.innerHTML='<span title="'+esc(addr)+'">'+esc(addr)+'</span><button type="button" aria-label="Remove '+esc(addr)+'">×</button>';
+    chip.querySelector('button').onclick=e=>{e.stopPropagation();emailLists[key].splice(i,1);renderEmails(key);input.focus();};
+    box.insertBefore(chip,input);
+  });
+  input.placeholder=emailLists[key].length?'Add another email':EMAIL_PLACEHOLDER[key];
+}
+function emailError(key,msg){document.getElementById(key+'-emails-error').textContent=msg||'';document.getElementById(key+'-emails').classList.toggle('invalid',!!msg);}
+function commitEmails(key){
+  const input=document.getElementById(key+'-emails-entry');const parts=splitEmails(input.value);
+  const bad=parts.filter(p=>!EMAIL_RE.test(p));
+  parts.filter(p=>EMAIL_RE.test(p)).forEach(p=>{if(!emailLists[key].some(x=>x.toLowerCase()===p.toLowerCase()))emailLists[key].push(p);});
+  input.value=bad.join(' ');
+  emailError(key,bad.length?bad[0]+' isn’t a valid email address. Check it and press Enter again.':'');
+  renderEmails(key);return !bad.length;
+}
+function setEmails(key,str){emailLists[key]=splitEmails(str);document.getElementById(key+'-emails-entry').value='';emailError(key,'');renderEmails(key);}
+function getEmails(key){return commitEmails(key)?emailLists[key].join(','):null;} // null = something invalid is still typed
+function initEmailField(key){
+  emailLists[key]=[];const box=document.getElementById(key+'-emails');const input=box.querySelector('.email-entry');
+  box.addEventListener('click',()=>input.focus());
+  input.addEventListener('keydown',e=>{
+    if(['Enter',',',';',' '].includes(e.key)||(e.key==='Tab'&&input.value.trim())){if(input.value.trim()||e.key!=='Tab'){e.preventDefault();commitEmails(key);}}
+    else if(e.key==='Backspace'&&!input.value&&emailLists[key].length){emailLists[key].pop();renderEmails(key);}
+    else if(document.getElementById(key+'-emails-error').textContent)emailError(key,'');
+  });
+  input.addEventListener('paste',e=>{e.preventDefault();input.value+=(e.clipboardData||window.clipboardData).getData('text');commitEmails(key);});
+  input.addEventListener('blur',()=>{if(input.value.trim())commitEmails(key);});
+  renderEmails(key);
+}
+function emailSummary(str){const l=splitEmails(str);if(!l.length)return '<em class="muted">Alert settings list</em>';return '<span title="'+esc(l.join(', '))+'">'+esc(l[0])+(l.length>1?' <span class="muted">+'+(l.length-1)+' more</span>':'')+'</span>';}
+
+// ---------- Navigation, modals, toasts ----------
+function showSection(name,el){
+  document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById('section-'+name).classList.add('active');
+  (el||document.querySelector('.nav-item[data-section="'+name+'"]')).classList.add('active');
+  if(name==='incidents')loadIncidents();if(name==='latency')populateCustomerDropdown();if(name==='audit')loadAudit();
+}
+let toastTimer=null;
+function showToast(msg,type='success',ms=3500){const t=document.getElementById('toast');t.textContent=msg;t.className=type;t.style.display='block';clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.style.display='none',ms);}
+function openModal(id){document.getElementById(id).classList.add('open');const f=document.querySelector('#'+id+' input:not([type=hidden])');if(f)setTimeout(()=>f.focus(),50);}
+function closeModal(id){document.getElementById(id).classList.remove('open');}
+function overlayClose(e,id){if(e.target===document.getElementById(id))closeModal(id);}
+document.addEventListener('keydown',e=>{if(e.key==='Escape')document.querySelectorAll('.modal-overlay.open').forEach(m=>m.classList.remove('open'));});
+
+// ---------- Devices table ----------
+async function loadHosts(){
+  const badge=document.getElementById('last-updated');
+  try{
+    const res=await fetch('/api/hosts');if(!res.ok)throw new Error();
+    allHosts=await res.json();
+    badge.className='refresh-badge ok';
+    badge.textContent='Updated '+new Date().toLocaleTimeString([],{hour:'numeric',minute:'2-digit',second:'2-digit'});
+  }catch(e){
+    badge.className='refresh-badge err';badge.textContent='Can’t reach the monitor. Retrying…';return;
+  }
+  const count=s=>allHosts.filter(h=>h.status===s).length;
+  document.getElementById('stat-total').textContent=allHosts.length;
+  document.getElementById('stat-online').textContent=count('up');
+  document.getElementById('stat-offline').textContent=count('down');
+  document.getElementById('stat-pending').textContent=count('unknown');
+  const names=[...new Set(allHosts.map(h=>h.customer_name))].sort((a,b)=>a.localeCompare(b));
+  document.getElementById('customer-list').innerHTML=names.map(n=>'<option value="'+esc(n)+'">').join('');
+  renderHosts();
+}
+function currentFilter(){return{text:document.getElementById('filter-text').value.trim().toLowerCase(),status:document.getElementById('filter-status').value};}
+function hostMatches(h,f){
+  const hay=(h.ip_address+' '+h.customer_name+' '+(h.location||'')+' '+(h.device_type||'')).toLowerCase();
+  return(!f.text||hay.includes(f.text))&&(!f.status||h.status===f.status);
+}
+function groupHosts(){
+  const groups={};allHosts.forEach(h=>{(groups[h.customer_name]=groups[h.customer_name]||[]).push(h);});
+  return Object.entries(groups).map(([name,list])=>{
+    list.sort((a,b)=>(STATUS_ORDER[a.status]??3)-(STATUS_ORDER[b.status]??3)||a.ip_address.localeCompare(b.ip_address,undefined,{numeric:true}));
+    return{name,list,online:list.filter(h=>h.status==='up').length,offline:list.filter(h=>h.status==='down').length,pending:list.filter(h=>h.status==='unknown').length};
+  }).sort((a,b)=>(b.offline>0)-(a.offline>0)||a.name.localeCompare(b.name)); // customers with outages first
+}
+function renderHosts(){
+  const tbody=document.getElementById('hosts-grouped');
+  const f=currentFilter();const filtering=!!(f.text||f.status);
+  document.querySelectorAll('.stat-card').forEach(c=>c.classList.toggle('selected',!f.text&&c.dataset.filter===f.status&&(f.status!==''||false)));
+  if(!allHosts.length){tbody.innerHTML=emptyRow(8,'No devices yet','Add one above, or download the CSV template to add many at once.');return;}
+  let html='';let shown=0;
+  groupHosts().forEach((g,gi)=>{
+    const matches=g.list.filter(h=>hostMatches(h,f)||(f.text&&g.name.toLowerCase().includes(f.text)&&(!f.status||h.status===f.status)));
+    if(filtering&&!matches.length)return;
+    shown++;
+    const open=expandedGroups.has(g.name);
+    html+='<tr class="summary-row" tabindex="0" aria-expanded="'+open+'" data-gi="'+gi+'" onclick="toggleGroup(this)" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();toggleGroup(this);}">'
+      +'<td colspan="2" style="font-weight:700;"><span class="expand-icon" style="'+(open?'transform:rotate(90deg)':'')+'">▶</span> '+esc(g.name)+'</td>'
+      +'<td><strong>'+g.list.length+'</strong> device'+(g.list.length===1?'':'s')+'</td>'
+      +'<td><span class="badge '+(g.online?'badge-up':'badge-unknown')+'">'+g.online+'</span> online</td>'
+      +'<td><span class="badge '+(g.offline?'badge-down':'badge-unknown')+'">'+g.offline+'</span> offline</td>'
+      +'<td><span class="badge badge-unknown">'+g.pending+'</span> waiting</td>'
+      +'<td colspan="2" class="muted" style="font-size:0.78rem;">'+(filtering&&matches.length!==g.list.length?'Showing '+matches.length+' of '+g.list.length:'')+'</td></tr>';
+    if(!open)return;
+    html+='<tr class="detail-row detail-header"><td>Status</td><td>IP address</td><td>Location</td><td>Device type</td><td>Checked every</td><td>Alerts go to</td><td>Last checked</td><td>Actions</td></tr>';
+    (filtering?matches:g.list).forEach(h=>{
+      html+='<tr class="detail-row"><td><span class="badge badge-'+esc(h.status)+'">'+(STATUS_LABEL[h.status]||esc(h.status))+'</span></td>'
+        +'<td>'+esc(h.ip_address)+'</td><td>'+(esc(h.location)||'—')+'</td><td>'+(esc(h.device_type)||'—')+'</td>'
+        +'<td>'+intervalLabel(h.ping_interval)+'</td>'
+        +'<td style="font-size:0.8rem;">'+emailSummary(h.alert_to)+'</td>'
+        +'<td style="font-size:0.8rem;" title="'+esc(fmtTime(h.last_checked))+'">'+timeAgo(h.last_checked)+'</td>'
+        +'<td style="white-space:nowrap;"><button class="btn btn-teal btn-sm" title="Check this device right now" onclick="event.stopPropagation();pingOne('+h.id+',this)">Ping now</button> '
+        +'<button class="btn btn-outline btn-sm" onclick="event.stopPropagation();openEdit('+h.id+')">Edit</button> '
+        +'<button class="btn btn-danger btn-sm" onclick="event.stopPropagation();deleteHost('+h.id+')">Delete</button></td></tr>';
+    });
+  });
+  tbody.innerHTML=shown?html:emptyRow(8,'No devices match','Try a different search, or choose “All statuses”.');
+  window._groups=groupHosts();
+}
+function toggleGroup(row){const g=window._groups[+row.dataset.gi];if(!g)return;expandedGroups.has(g.name)?expandedGroups.delete(g.name):expandedGroups.add(g.name);renderHosts();}
+function onFilterChange(){
+  const f=currentFilter();
+  if(f.text||f.status){
+    if(savedExpanded===null)savedExpanded=new Set(expandedGroups);
+    expandedGroups=new Set(groupHosts().filter(g=>g.list.some(h=>hostMatches(h,f))||(f.text&&g.name.toLowerCase().includes(f.text))).map(g=>g.name));
+  }else{expandedGroups=savedExpanded||new Set();savedExpanded=null;}
+  renderHosts();
+}
+document.addEventListener('DOMContentLoaded',()=>{
+  document.querySelectorAll('.stat-card').forEach(c=>{
+    const go=()=>{document.getElementById('filter-text').value='';document.getElementById('filter-status').value=c.dataset.filter;onFilterChange();document.getElementById('hosts-table').scrollIntoView({behavior:'smooth',block:'start'});};
+    c.addEventListener('click',go);c.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();go();}});
+  });
+  ['quick-ip','quick-name','quick-location'].forEach(id=>document.getElementById(id).addEventListener('keydown',e=>{if(e.key==='Enter')quickAdd();}));
+});
+
+// ---------- Add / edit / delete ----------
+async function postHost(body){
+  if(!body.ip_address||!body.customer_name){showToast('Enter an IP address and a customer name.','error');return false;}
+  const res=await fetch('/api/hosts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  if(res.ok){showToast('Device added: '+body.ip_address+' ('+body.customer_name+')');return true;}
+  const e=await res.json().catch(()=>({}));
+  showToast(res.status===409?body.ip_address+' is already being monitored.':(e.error||'Couldn’t add the device. Try again.'),'error',5000);return false;
+}
+async function quickAdd(){
+  const v=id=>document.getElementById(id).value.trim();
+  const ok=await postHost({ip_address:v('quick-ip'),customer_name:v('quick-name'),location:v('quick-location'),device_type:v('quick-device-type'),ping_interval:v('quick-ping-interval'),alert_to:'',notes:''});
+  if(ok){['quick-ip','quick-location'].forEach(id=>document.getElementById(id).value='');document.getElementById('quick-ip').focus();loadHosts();}
+}
+async function addHost(){
+  const v=id=>document.getElementById(id).value.trim();
+  const emails=getEmails('add');if(emails===null)return;
+  const ok=await postHost({ip_address:v('add-ip'),customer_name:v('add-name'),location:v('add-location'),device_type:v('add-device-type'),ping_interval:v('add-ping-interval'),alert_to:emails,notes:v('add-notes')});
+  if(ok){closeModal('add-modal');['add-ip','add-name','add-location','add-notes'].forEach(id=>document.getElementById(id).value='');setEmails('add','');document.getElementById('add-ping-interval').value='300';document.getElementById('add-device-type').value='';loadHosts();}
+}
+function openEdit(id){
+  const h=allHosts.find(x=>x.id===id);if(!h)return;
+  const set=(k,v)=>document.getElementById(k).value=v;
+  set('edit-id',h.id);set('edit-ip',h.ip_address);set('edit-name',h.customer_name);set('edit-location',h.location||'');
+  set('edit-device-type',h.device_type||'');set('edit-ping-interval',h.ping_interval||300);setEmails('edit',h.alert_to||'');set('edit-notes',h.notes||'');
+  openModal('edit-modal');
+}
+async function saveEdit(){
+  const v=id=>document.getElementById(id).value.trim();
+  const emails=getEmails('edit');if(emails===null)return;
+  const body={ip_address:v('edit-ip'),customer_name:v('edit-name'),location:v('edit-location'),device_type:v('edit-device-type'),ping_interval:v('edit-ping-interval'),alert_to:emails,notes:v('edit-notes')};
+  if(!body.ip_address||!body.customer_name){showToast('Enter an IP address and a customer name.','error');return;}
+  const res=await fetch('/api/hosts/'+v('edit-id'),{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  if(res.ok){showToast('Changes saved');closeModal('edit-modal');loadHosts();}
+  else{const e=await res.json().catch(()=>({}));showToast(e.error||'Couldn’t save. Try again.','error',6000);}
+}
+async function deleteHost(id){
+  const h=allHosts.find(x=>x.id===id);const label=h?h.ip_address+' ('+h.customer_name+')':'this device';
+  if(!confirm('Delete '+label+'?\n\nIt will stop being monitored, and its ping history and incidents will be removed. This can’t be undone.'))return;
+  const res=await fetch('/api/hosts/'+id,{method:'DELETE'});
+  if(res.ok){showToast('Deleted '+label);loadHosts();}else showToast('Couldn’t delete. Try again.','error');
+}
+async function pingOne(id,btn){
+  btn.textContent='Pinging…';btn.disabled=true;
+  try{const res=await fetch('/api/hosts/'+id+'/ping',{method:'POST'});const h=await res.json();
+    showToast(h.ip_address+' is '+(STATUS_LABEL[h.status]||h.status).toLowerCase(),h.status==='up'?'success':'error');}
+  catch(e){showToast('Couldn’t run the ping. Try again.','error');}
+  loadHosts();
+}
+
+// ---------- CSV import / export ----------
+function exportCsv(){window.location='/api/report/csv';}
+function dropCsv(e,zone){e.preventDefault();zone.classList.remove('drag-over');const f=e.dataTransfer.files[0];if(!f)return;if(!f.name.toLowerCase().endsWith('.csv')){showToast('That isn’t a CSV file. Save it as .csv and try again.','error',5000);return;}const dt=new DataTransfer();dt.items.add(f);const input=document.getElementById('import-file');input.files=dt.files;importCsv(input);}
+async function importCsv(input){
+  if(!input.files[0])return;
+  const fd=new FormData();fd.append('file',input.files[0]);input.value='';
+  showToast('Importing…');
+  try{
+    const res=await fetch('/api/hosts/import',{method:'POST',body:fd});const d=await res.json();
+    if(!res.ok){showToast(d.error||'Import failed.','error',6000);return;}
+    let msg='Added '+d.added+' device'+(d.added===1?'':'s')+'.';
+    if(d.skipped)msg+=' '+d.skipped+' already monitored, skipped.';
+    if(d.errors&&d.errors.length)msg+=' '+d.errors.length+' row'+(d.errors.length===1?'':'s')+' had problems: '+d.errors.slice(0,3).join('; ')+(d.errors.length>3?'…':'');
+    showToast(msg,d.errors&&d.errors.length?'error':'success',d.errors&&d.errors.length?9000:4000);
+  }catch(e){showToast('Import failed. Check that the file uses the template’s columns.','error',6000);}
+  loadHosts();
+}
+
+// ---------- Incidents ----------
+async function loadIncidents(){
+  const data=await fetch('/api/incidents?limit=200').then(r=>r.json());
+  document.getElementById('incidents-tbody').innerHTML=data.length?data.map(i=>'<tr><td><span class="badge '+(i.resolved?'badge-up':'badge-down')+'">'+(i.resolved?'Resolved':'Still offline')+'</span></td><td>'+esc(i.customer_name)+'</td><td>'+esc(i.ip_address)+'</td><td>'+(esc(i.location)||'—')+'</td><td>'+fmtTime(i.started_at)+'</td><td>'+(i.ended_at?fmtTime(i.ended_at):'—')+'</td><td>'+(i.resolved?fmtDuration(i.duration_seconds):'Ongoing')+'</td></tr>').join('')
+    :emptyRow(7,'No outages recorded','When a device goes offline, it will show up here.');
+}
+
+// ---------- Latency ----------
+async function populateCustomerDropdown(){
+  const sel=document.getElementById('latency-customer');const keep=sel.value;
+  const names=[...new Set(allHosts.map(h=>h.customer_name))].sort((a,b)=>a.localeCompare(b));
+  sel.innerHTML='<option value="">Select a customer…</option>'+names.map(n=>'<option value="'+esc(n)+'">'+esc(n)+'</option>').join('');
+  if(keep&&names.includes(keep))sel.value=keep;
+}
+function onCustomerChange(){
+  const sel=document.getElementById('latency-customer');const tabs=document.getElementById('latency-tabs');
+  if(!sel.value){tabs.innerHTML='';document.getElementById('latency-content').innerHTML='';return;}
+  const windows=[['Last hour',1],['Last 6 hours',6],['Last 24 hours',24],['Last 7 days',168],['Last 30 days',720]];
+  tabs.innerHTML='';
+  windows.forEach(([label,hours],i)=>{
+    const b=document.createElement('button');b.className='btn btn-outline latency-tab';b.textContent=label;
+    b.onclick=()=>{document.querySelectorAll('.latency-tab').forEach(x=>{x.classList.remove('btn-primary');x.classList.add('btn-outline');x.setAttribute('aria-pressed','false');});b.classList.add('btn-primary');b.classList.remove('btn-outline');b.setAttribute('aria-pressed','true');loadLatency(sel.value,hours);};
+    tabs.appendChild(b);if(i===2)b.click();
+  });
+}
+async function loadLatency(customer,hours){
+  const content=document.getElementById('latency-content');
+  content.innerHTML='<p class="muted" style="padding:12px">Loading…</p>';
+  const data=await fetch('/api/latency/customer?customer='+encodeURIComponent(customer)+'&hours='+hours).then(r=>r.json());
+  if(!data.length){content.innerHTML='<p class="muted">No devices found for this customer.</p>';return;}
+  const metric=(l,v)=>'<div><div class="metric-label">'+l+'</div><div class="metric-value">'+v+'</div></div>';
+  content.innerHTML=data.map((host,idx)=>{
+    const p=host.pings||[];const up=p.filter(x=>x.status==='up').length;const lats=p.filter(x=>x.latency_ms).map(x=>x.latency_ms);
+    const avg=lats.length?(lats.reduce((a,b)=>a+b,0)/lats.length).toFixed(1)+' ms':'—';
+    const meta=[host.location,host.device_type,'checked every '+intervalLabel(host.ping_interval)].filter(Boolean).map(esc).join(', ');
+    return '<div class="card" style="margin-bottom:12px;"><h2>'+esc(host.ip_address)+' <span style="font-weight:400;font-size:0.82rem;" class="muted">'+meta+'</span></h2>'
+      +'<div style="display:flex;gap:28px;margin-bottom:14px;flex-wrap:wrap;">'+metric('Uptime',p.length?((up/p.length)*100).toFixed(1)+'%':'—')+metric('Average',avg)+metric('Fastest',lats.length?Math.min(...lats).toFixed(1)+' ms':'—')+metric('Slowest',lats.length?Math.max(...lats).toFixed(1)+' ms':'—')+metric('Pings',p.length)+'</div>'
+      +(p.length?'<div style="height:250px;margin-bottom:16px;"><canvas id="chart-'+idx+'" aria-label="Latency chart for '+esc(host.ip_address)+'"></canvas></div>':'<p class="muted">No pings in this time range.</p>')+'</div>';
+  }).join('');
+  data.forEach((host,idx)=>{
+    const p=host.pings||[];const canvas=document.getElementById('chart-'+idx);if(!canvas||!p.length||!window.Chart)return;
+    const statuses=p.map(x=>x.status);const colors=statuses.map(s=>s==='up'?'#22C55E':'#EF4444');
+    new Chart(canvas,{type:'line',data:{labels:p.map(x=>fmtTime(x.timestamp)),datasets:[{label:'Latency (ms)',data:p.map(x=>x.latency_ms),borderColor:'#F5C800',backgroundColor:'rgba(245,200,0,0.1)',borderWidth:2,pointBackgroundColor:colors,pointBorderColor:colors,pointRadius:2,fill:true,tension:0.3,spanGaps:true}]},
+      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>(STATUS_LABEL[statuses[ctx.dataIndex]]||'')+': '+(ctx.parsed.y!=null?ctx.parsed.y+' ms':'no response')}}},
+      scales:{x:{display:false},y:{title:{display:true,text:'ms',color:'#6B7280'},ticks:{color:'#6B7280'},grid:{color:'#E5E5E5'},beginAtZero:true}}}});
+  });
+}
+
+// ---------- Audit log ----------
+async function loadAudit(){
+  const data=await fetch('/api/audit-log').then(r=>r.json());
+  document.getElementById('audit-tbody').innerHTML=data.length?data.map(a=>'<tr><td style="white-space:nowrap;">'+fmtTime(a.timestamp)+'</td><td>'+(AUDIT_LABEL[a.action]||esc(a.action))+'</td><td>'+esc(a.target)+'</td><td>'+(esc(a.detail)||'—')+'</td></tr>').join('')
+    :emptyRow(4,'No changes yet','Adding, editing or deleting devices will be recorded here.');
+}
+
+// ---------- Settings ----------
+async function openSettingsModal(){const s=await fetch('/api/settings').then(r=>r.json());setEmails('settings',s.alert_to||'');openModal('settings-modal');setTimeout(()=>document.getElementById('settings-emails-entry').focus(),60);}
+async function checkAlertSettings(){try{const s=await fetch('/api/settings').then(r=>r.json());document.getElementById('no-alerts-notice').hidden=!!splitEmails(s.alert_to).length;}catch(e){}}
+async function saveSettings(){
+  const emails=getEmails('settings');if(emails===null)return;
+  const res=await fetch('/api/settings',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({alert_to:emails})});
+  if(res.ok){const n=splitEmails(emails).length;showToast(n?'Saved. Alerts will go to '+n+' '+(n===1?'person':'people')+'.':'Saved. No one is set to get alerts.',n?'success':'error');closeModal('settings-modal');checkAlertSettings();}
+  else{const e=await res.json().catch(()=>({}));showToast(e.error||'Couldn’t save settings. Try again.','error',6000);}
+}
+
+fillSelects();
+['settings','add','edit'].forEach(initEmailField);
+loadHosts();
+checkAlertSettings();
+setInterval(loadHosts,REFRESH_MS);
+setInterval(()=>{if(document.getElementById('section-incidents').classList.contains('active'))loadIncidents();},REFRESH_MS);
+</script>
+</body>
+</html>
