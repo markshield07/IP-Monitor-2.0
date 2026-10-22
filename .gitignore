@@ -1,0 +1,13 @@
+# Secrets and settings
+.env
+
+# Database files (contain customer IPs and ping history)
+*.db
+*.db-wal
+*.db-shm
+
+# Python clutter
+__pycache__/
+*.pyc
+venv/
+.venv/
